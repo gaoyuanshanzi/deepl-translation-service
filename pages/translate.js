@@ -506,7 +506,7 @@ export default function TranslatePage() {
             <button
               className={`btn btn-primary ${styles.translateBtn}`}
               onClick={handleTranslate}
-              disabled={isTranslating || !file || !targetLang}
+              disabled={isTranslating || !targetLang || (sourceType === 'file' ? !file : !manualText.trim())}
               id="translate-btn"
             >
               {isTranslating ? (
