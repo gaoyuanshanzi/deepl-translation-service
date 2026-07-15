@@ -134,6 +134,19 @@ export default function TranslatePage() {
       })
   }
 
+  // ── Copy Translated Text ───────────────────────────────────
+  const handleCopyTranslatedText = () => {
+    if (!translatedText) return
+    navigator.clipboard.writeText(translatedText)
+      .then(() => {
+        setSuccess('번역 결과가 클립보드에 복사되었습니다.')
+        setTimeout(() => setSuccess(''), 3000)
+      })
+      .catch(() => {
+        setError('결과 복사에 실패했습니다.')
+      })
+  }
+
   // ── Language detection via DeepL ───────────────────────────
   const detectLanguage = async (content, ext) => {
     try {
@@ -545,12 +558,20 @@ export default function TranslatePage() {
           {/* ── Result & Download ── */}
           {translatedText && (
             <section className={`glass-card ${styles.section}`} id="result-section">
-              <h2 className={styles.sectionTitle}>
-                <span className={styles.sectionIcon}>✅</span> 번역 결과
-                <span className={styles.resultBadge}>
-                  {getLangFlag(targetLang)} {getLangLabel(targetLang)}
-                </span>
-              </h2>
+              <div className={styles.sectionHeaderRow}>
+                <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>
+                  <span className={styles.sectionIcon}>✅</span> 번역 결과
+                  <span className={styles.resultBadge}>
+                    {getLangFlag(targetLang)} {getLangLabel(targetLang)}
+                  </span>
+                </h2>
+                <button
+                  className={`btn btn-secondary ${styles.copyInputBtn}`}
+                  onClick={handleCopyTranslatedText}
+                >
+                  📋 결과 복사
+                </button>
+              </div>
 
               <div className={styles.preview}>
                 <pre className={styles.previewText}>{translatedText}</pre>
