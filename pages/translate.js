@@ -42,11 +42,17 @@ export default function TranslatePage() {
   // Session
   const [apiKey, setApiKey] = useState('')
 
+  // Translation Source Type
+  const [sourceType, setSourceType] = useState('file') // 'file' | 'text'
+
   // File
   const [file, setFile]           = useState(null)
   const [fileContent, setFileContent] = useState('')
   const [fileType, setFileType]   = useState('') // 'txt' | 'html'
   const [isDragging, setIsDragging] = useState(false)
+
+  // Direct Text Input
+  const [manualText, setManualText] = useState('')
 
   // Language
   const [detectedLang, setDetectedLang] = useState(null) // detected from DeepL
@@ -71,6 +77,15 @@ export default function TranslatePage() {
     setApiKey(parsed.apiKey)
   }, [router])
 
+  // Direct Text language detection (Debounced)
+  useEffect(() => {
+    if (sourceType !== 'text' || !manualText.trim()) return
+    const delayDebounce = setTimeout(() => {
+      detectLanguage(manualText, 'txt')
+    }, 1000)
+    return () => clearTimeout(delayDebounce)
+  }, [manualText, sourceType])
+
   // ── File handling ──────────────────────────────────────────
   const readFile = (f) => {
     const ext = f.name.split('.').pop().toLowerCase()
@@ -85,6 +100,7 @@ export default function TranslatePage() {
     setProgress(0)
     setFileType(ext === 'htm' ? 'html' : ext)
     setFile(f)
+    setSourceType('file')
 
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -105,6 +121,19 @@ export default function TranslatePage() {
     if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0])
   }
 
+  // ── Copy Manual Text ───────────────────────────────────────
+  const handleCopyManualText = () => {
+    if (!manualText.trim()) return
+    navigator.clipboard.writeText(manualText)
+      .then(() => {
+        setSuccess('입력한 텍스트가 클립보드에 복사되었습니다.')
+        setTimeout(() => setSuccess(''), 3000)
+      })
+      .catch(() => {
+        setError('텍스트 복사에 실패했습니다.')
+      })
+  }
+
   // ── Language detection via DeepL ───────────────────────────
   const detectLanguage = async (content, ext) => {
     try {
@@ -112,6 +141,8 @@ export default function TranslatePage() {
       const textSample = ext === 'html' || ext === 'htm'
         ? stripHtml(content).slice(0, 500)
         : content.slice(0, 500)
+
+      if (!textSample.trim()) return
 
       const res = await fetch('/api/translate', {
         method: 'POST',
@@ -137,7 +168,15 @@ export default function TranslatePage() {
     setError('')
     setSuccess('')
 
-    if (!file || !fileContent) { setError('먼저 파일을 업로드해주세요.'); return }
+    const sourceContent = sourceType === 'file' ? fileContent : manualText
+    if (sourceType === 'file' && (!file || !fileContent)) { 
+      setError('먼저 파일을 업로드해주세요.'); 
+      return 
+    }
+    if (sourceType === 'text' && !manualText.trim()) {
+      setError('번역할 텍스트를 입력해주세요.');
+      return
+    }
     if (!targetLang) { setError('번역할 언어를 선택해주세요.'); return }
 
     if (detectedLang && detectedLang === targetLang) {
@@ -151,8 +190,8 @@ export default function TranslatePage() {
 
     try {
       // HTML이면 텍스트 추출, TXT면 그대로
-      const isHtml = fileType === 'html'
-      const plainText = isHtml ? stripHtml(fileContent) : fileContent
+      const isHtml = sourceType === 'file' && fileType === 'html'
+      const plainText = isHtml ? stripHtml(sourceContent) : sourceContent
 
       const chunks = chunkText(plainText)
       const total = chunks.length
@@ -208,12 +247,12 @@ export default function TranslatePage() {
   const handleDownload = () => {
     if (!translatedText) return
     const langLabel = getLangLabel(targetLang)
-    const baseName = file.name.replace(/\.[^.]+$/, '')
+    const baseName = sourceType === 'file' ? file.name.replace(/\.[^.]+$/, '') : 'manual_translation'
 
     let content, mimeType, ext
 
     if (downloadFmt === 'html') {
-      content = buildHtmlOutput(translatedText, langLabel, file.name, detectedLang, targetLang)
+      content = buildHtmlOutput(translatedText, langLabel, sourceType === 'file' ? file.name : '수동 입력 텍스트', detectedLang, targetLang)
       mimeType = 'text/html;charset=utf-8'
       ext = 'html'
     } else {
@@ -284,64 +323,128 @@ export default function TranslatePage() {
         </header>
 
         <main className={styles.main}>
-          {/* ── Upload Zone ── */}
-          <section className={`glass-card ${styles.section}`}>
-            <h2 className={styles.sectionTitle}>
-              <span className={styles.sectionIcon}>📁</span> 문서 업로드
-            </h2>
-            <div
-              className={`${styles.dropzone} ${isDragging ? styles.dragging : ''} ${file ? styles.hasFile : ''}`}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              aria-label="파일 업로드 영역"
-              id="file-dropzone"
+          {/* ── Translation Source Selection ── */}
+          <div className={styles.sourceToggle}>
+            <button
+              className={`${styles.sourceBtn} ${sourceType === 'file' ? styles.sourceActive : ''}`}
+              onClick={() => {
+                setSourceType('file')
+                setDetectedLang(fileContent ? null : detectedLang)
+                if (fileContent) detectLanguage(fileContent, fileType)
+              }}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,.html,.htm"
-                onChange={handleFileInput}
-                style={{ display: 'none' }}
-                id="file-input"
-              />
-              {file ? (
-                <div className={styles.fileInfo}>
-                  <span className={styles.fileIcon}>{fileType === 'html' ? '🌐' : '📄'}</span>
-                  <div>
-                    <p className={styles.fileName}>{file.name}</p>
-                    <p className={styles.fileMeta}>
-                      {(file.size / 1024).toFixed(1)} KB · {fileType.toUpperCase()} 파일
-                      {detectedLang && (
-                        <span className={styles.detectedBadge}>
-                          {getLangFlag(detectedLang)} 감지된 언어: {getLangLabel(detectedLang)}
-                        </span>
-                      )}
-                    </p>
+              📄 파일 번역
+            </button>
+            <button
+              className={`${styles.sourceBtn} ${sourceType === 'text' ? styles.sourceActive : ''}`}
+              onClick={() => {
+                setSourceType('text')
+                setDetectedLang(manualText ? null : detectedLang)
+                if (manualText) detectLanguage(manualText, 'txt')
+              }}
+            >
+              ✍️ 텍스트 직접 입력
+            </button>
+          </div>
+
+          {/* ── Upload Zone ── */}
+          {sourceType === 'file' && (
+            <section className={`glass-card ${styles.section}`}>
+              <h2 className={styles.sectionTitle}>
+                <span className={styles.sectionIcon}>📁</span> 문서 업로드
+              </h2>
+              <div
+                className={`${styles.dropzone} ${isDragging ? styles.dragging : ''} ${file ? styles.hasFile : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                aria-label="파일 업로드 영역"
+                id="file-dropzone"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.html,.htm"
+                  onChange={handleFileInput}
+                  style={{ display: 'none' }}
+                  id="file-input"
+                />
+                {file ? (
+                  <div className={styles.fileInfo}>
+                    <span className={styles.fileIcon}>{fileType === 'html' ? '🌐' : '📄'}</span>
+                    <div>
+                      <p className={styles.fileName}>{file.name}</p>
+                      <p className={styles.fileMeta}>
+                        {(file.size / 1024).toFixed(1)} KB · {fileType.toUpperCase()} 파일
+                        {detectedLang && (
+                          <span className={styles.detectedBadge}>
+                            {getLangFlag(detectedLang)} 감지된 언어: {getLangLabel(detectedLang)}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      className={styles.removeFile}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setFile(null); setFileContent(''); setDetectedLang(null)
+                        setTranslatedText(''); setProgress(0)
+                        setError(''); setSuccess('')
+                      }}
+                      aria-label="파일 제거"
+                    >✕</button>
                   </div>
+                ) : (
+                  <div className={styles.dropzoneEmpty}>
+                    <div className={styles.dropIcon}>📂</div>
+                    <p className={styles.dropTitle}>파일을 드래그하거나 클릭하여 업로드</p>
+                    <p className={styles.dropSub}>지원 형식: TXT, HTML · 최대 10MB</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* ── Direct Text Window ── */}
+          {sourceType === 'text' && (
+            <section className={`glass-card ${styles.section}`}>
+              <div className={styles.sectionHeaderRow}>
+                <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>
+                  <span className={styles.sectionIcon}>✍️</span> 텍스트 입력
+                </h2>
+                <div className={styles.textActions}>
+                  {detectedLang && (
+                    <span className={styles.detectedBadge} style={{ marginRight: 8 }}>
+                      {getLangFlag(detectedLang)} 감지된 언어: {getLangLabel(detectedLang)}
+                    </span>
+                  )}
                   <button
-                    className={styles.removeFile}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setFile(null); setFileContent(''); setDetectedLang(null)
-                      setTranslatedText(''); setProgress(0)
-                      setError(''); setSuccess('')
-                    }}
-                    aria-label="파일 제거"
-                  >✕</button>
+                    className={`btn btn-secondary ${styles.copyInputBtn}`}
+                    onClick={handleCopyManualText}
+                    disabled={!manualText.trim()}
+                  >
+                    📋 복사하기
+                  </button>
                 </div>
-              ) : (
-                <div className={styles.dropzoneEmpty}>
-                  <div className={styles.dropIcon}>📂</div>
-                  <p className={styles.dropTitle}>파일을 드래그하거나 클릭하여 업로드</p>
-                  <p className={styles.dropSub}>지원 형식: TXT, HTML · 최대 10MB</p>
-                </div>
-              )}
-            </div>
-          </section>
+              </div>
+              <div className={styles.textareaWrapper}>
+                <textarea
+                  className={styles.largeTextarea}
+                  placeholder="번역할 텍스트를 여기에 직접 붙여넣거나 입력하세요..."
+                  value={manualText}
+                  onChange={(e) => {
+                    setManualText(e.target.value)
+                    setTranslatedText('')
+                    setProgress(0)
+                    setError('')
+                  }}
+                />
+              </div>
+            </section>
+          )}
 
           {/* ── Language Selection ── */}
           <section className={`glass-card ${styles.section}`}>

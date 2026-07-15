@@ -401,3 +401,91 @@
   .downloadRow { flex-direction: column; align-items: stretch; }
   .downloadBtn { width: 100%; }
 }
+
+/* ─── Source Toggle (File vs Text) ───────────── */
+.sourceToggle {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+
+.sourceBtn {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sourceBtn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sourceActive {
+  background: var(--bg-card-hover) !important;
+  color: var(--accent-primary) !important;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ─── Section Header Row ─────────────────────── */
+.sectionHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.textActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyInputBtn {
+  font-size: 0.8rem;
+  padding: 8px 16px;
+}
+
+/* ─── Textarea Wrapper ───────────────────────── */
+.textareaWrapper {
+  width: 100%;
+}
+
+.largeTextarea {
+  width: 100%;
+  min-height: 240px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  transition: var(--transition);
+}
+
+.largeTextarea:focus {
+  border-color: var(--accent-primary);
+  background: rgba(99, 179, 237, 0.02);
+  box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.1);
+}
+
